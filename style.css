@@ -488,7 +488,7 @@ h2 {
    ========================================================== */
 .gates {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -701,6 +701,94 @@ h2 {
   100% { transform: scale(1); opacity: 1; }
 }
 
+
+/* ==========================================================
+   JSON gateway decision panel
+   ========================================================== */
+.json-panel {
+  --tone: 125, 136, 170;
+  padding: 24px;
+  border-color: rgba(var(--tone), 0.35);
+  box-shadow:
+    0 0 0 1px rgba(var(--tone), 0.12),
+    0 0 36px rgba(var(--tone), 0.14),
+    0 10px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: border-color 0.4s, box-shadow 0.4s;
+}
+
+.json-panel[data-status="approved"] { --tone: 0, 242, 254; border-color: rgba(var(--tone), 0.55); }
+.json-panel[data-status="blocked"]  { --tone: 255, 8, 68;  border-color: rgba(var(--tone), 0.7); }
+.json-panel[data-status="scanning"] { --tone: 79, 172, 254; }
+
+.json-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.json-head h2 { font-size: 1.2rem; }
+
+.json-box {
+  margin: 16px 0 0;
+  padding: 20px 22px;
+  min-height: 230px;
+  max-height: 440px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+  background: var(--inset);
+  border: 1px solid rgba(var(--tone), 0.3);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 0 40px rgba(var(--tone), 0.06);
+  transition: border-color 0.4s, box-shadow 0.4s;
+}
+
+.json-box:empty::before {
+  content: "Awaiting scan. The decision payload appears here.";
+  color: var(--text-faint);
+}
+
+.json-box.is-scanning { color: var(--text-faint); animation: dot-blink 0.9s ease-in-out infinite; }
+.json-box.updated { animation: json-in 0.5s ease-out; }
+
+@keyframes json-in {
+  from { opacity: 0.2; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.j-punc { color: var(--text-faint); }
+.j-key { color: var(--blue); }
+.j-str { color: #d6deff; }
+.j-num { color: var(--amber); font-weight: 500; }
+.j-act { color: #9ef0ff; }
+.j-ok  { color: var(--cyan); font-weight: 600; text-shadow: 0 0 12px rgba(0, 242, 254, 0.55); }
+.j-bad { color: #ff6f91; font-weight: 600; text-shadow: 0 0 12px rgba(255, 8, 68, 0.6); }
+.j-redacted {
+  padding: 0 4px;
+  border-radius: 4px;
+  color: var(--rose);
+  background: rgba(255, 8, 68, 0.16);
+  border: 1px solid rgba(255, 8, 68, 0.35);
+}
+
+.json-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin-top: 16px;
+}
+
+.btn-copy { flex: none; }
+.json-note { font-size: 0.78rem; color: var(--text-faint); }
+
 /* ==========================================================
    Audit log
    ========================================================== */
@@ -716,7 +804,7 @@ h2 {
 
 .audit-table {
   width: 100%;
-  min-width: 760px;
+  min-width: 900px;
   border-collapse: collapse;
   font-size: 0.86rem;
 }
@@ -814,6 +902,11 @@ h2 {
   .telemetry { margin-left: 0; width: 100%; }
   .stat { flex: 1 1 140px; }
   .stat-meter { flex: 2 1 240px; }
+}
+
+/* single-column page layout: the gates get the full width, so run them four across */
+@media (max-width: 1080px) and (min-width: 921px) {
+  .gates { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 @media (max-width: 760px) {

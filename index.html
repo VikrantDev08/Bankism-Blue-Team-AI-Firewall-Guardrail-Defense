@@ -76,7 +76,7 @@
           </div>
 
           <div class="console-actions">
-            <button type="button" class="btn btn-primary" id="scanBtn">Scan prompt</button>
+            <button type="button" class="btn btn-primary" id="scanBtn"><span class="btn-label">Scan prompt</span></button>
             <button type="button" class="btn btn-ghost" id="clearInputBtn">Clear</button>
           </div>
 
@@ -84,6 +84,7 @@
           <div class="chips" role="group" aria-label="Preset test prompts">
             <button type="button" class="chip" data-preset="safe" data-tone="safe"><span class="chip-dot" aria-hidden="true"></span>Safe query</button>
             <button type="button" class="chip" data-preset="injection" data-tone="threat"><span class="chip-dot" aria-hidden="true"></span>Prompt injection</button>
+            <button type="button" class="chip" data-preset="memo" data-tone="threat"><span class="chip-dot" aria-hidden="true"></span>Memo Injection Attack</button>
             <button type="button" class="chip" data-preset="pii" data-tone="warn"><span class="chip-dot" aria-hidden="true"></span>PII data leak</button>
             <button type="button" class="chip" data-preset="jailbreak" data-tone="threat"><span class="chip-dot" aria-hidden="true"></span>Jailbreak roleplay</button>
           </div>
@@ -106,6 +107,14 @@
               <small>Stop instruction overrides, prompt extraction and payloads</small>
             </span>
             <input type="checkbox" class="switch" id="ruleInjection" role="switch" checked>
+          </label>
+
+          <label class="switch-row" for="ruleMemo">
+            <span class="switch-text">
+              <strong>Inspect transaction memos</strong>
+              <small>Treat memo text as untrusted data and block hidden commands</small>
+            </span>
+            <input type="checkbox" class="switch" id="ruleMemo" role="switch" checked>
           </label>
 
           <label class="switch-row" for="ruleJailbreak">
@@ -155,10 +164,22 @@
               <ul class="gate-findings" data-role="findings"><li>Waiting for a prompt</li></ul>
             </article>
 
-            <article class="gate" data-gate="jailbreak" data-state="idle">
+            <article class="gate" data-gate="memo" data-state="idle">
               <div class="gate-scan" aria-hidden="true"></div>
               <div class="gate-head">
                 <span class="gate-index">Gate 3</span>
+                <span class="gate-state" data-role="state">Idle</span>
+              </div>
+              <svg class="gate-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m4 7.5 8 6 8-6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <h3>Memo inspector</h3>
+              <p class="gate-desc">Treats transaction memos as untrusted data and flags hidden commands.</p>
+              <ul class="gate-findings" data-role="findings"><li>Waiting for a prompt</li></ul>
+            </article>
+
+            <article class="gate" data-gate="jailbreak" data-state="idle">
+              <div class="gate-scan" aria-hidden="true"></div>
+              <div class="gate-head">
+                <span class="gate-index">Gate 4</span>
                 <span class="gate-state" data-role="state">Idle</span>
               </div>
               <svg class="gate-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m6.5 6.5 11 11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
@@ -169,14 +190,16 @@
           </div>
         </section>
 
-        <section class="panel glass decision" aria-labelledby="decisionTitle" aria-live="polite">
-          <div class="decision-head">
-            <h2 id="decisionTitle">Gateway decision</h2>
+        <section class="panel glass json-panel" id="jsonPanel" data-status="idle" aria-labelledby="jsonTitle">
+          <div class="json-head">
+            <h2 id="jsonTitle">Firewall Gateway Decision (JSON Response)</h2>
             <span class="badge badge-idle" id="verdictBadge">Awaiting prompt</span>
           </div>
-          <p class="decision-summary" id="decisionSummary">Run a quick test or paste a prompt. Each prompt passes through all three gates in order.</p>
-          <div class="output-label" id="outputLabel">Prompt as forwarded to the model</div>
-          <pre class="sanitized" id="sanitizedOutput" tabindex="0"></pre>
+          <pre class="json-box" id="jsonOutput" tabindex="0" aria-live="polite" aria-label="Firewall decision as JSON"></pre>
+          <div class="json-actions">
+            <button type="button" class="btn btn-primary btn-copy" id="copyJsonBtn" disabled><span class="btn-label">Copy JSON Payload</span></button>
+            <p class="json-note">Deterministic output: the same input and rules always produce the same payload.</p>
+          </div>
         </section>
       </div>
     </main>
@@ -194,6 +217,7 @@
               <th scope="col">Time</th>
               <th scope="col">ID</th>
               <th scope="col">Prompt (sanitized)</th>
+              <th scope="col">Parsed action</th>
               <th scope="col">Verdict</th>
               <th scope="col">Threat category</th>
               <th scope="col">Risk</th>

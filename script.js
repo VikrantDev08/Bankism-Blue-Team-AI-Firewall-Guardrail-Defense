@@ -290,6 +290,17 @@ function hasBalanceWord(text) {
    ---------------------------------------------------------- */
 const HARD_RISK = 90;
 const HARD_EXPLANATION = 'Detected unauthorized instruction override in transaction memo/directive.';
+const STATE_MANIPULATION_RISK = 85;
+const STATE_MANIPULATION_EXPLANATION = "Blocked unauthorized state manipulation attempt inside directive text ('Balance = ...').";
+
+/* Assignment-like state declarations are untrusted when found in a directive,
+   parenthetical, or memo scope. Include approved=true as an explicit state claim. */
+const STATE_ASSIGNMENT_RE = /\b(?:balance|amount|limit|status)\s*=|\bapproved\s*=\s*true\b/i;
+
+function findStateAssignment(scopeText) {
+  const match = normalizeForMatching(scopeText).match(STATE_ASSIGNMENT_RE);
+  return match ? match[0].replace(/\s+/g, ' ').trim() : null;
+}
 
 /* ignore, override, set, force + the other bypass verbs, with inflections */
 const SCOPE_DIRECTIVE_RE = /\b(?:ignor(?:e|es|ed|ing)|overrid(?:e|es|ing)|overrode|overridden|overrul(?:e|es|ed|ing)|bypass(?:es|ed|ing)?|disregard(?:s|ed|ing)?|circumvent(?:s|ed|ing)?|forget(?:s|ting)?|skip(?:s|ped|ping)?|set(?:s|ting)?|forc(?:e|es|ed|ing))\b/i;
@@ -694,24 +705,44 @@ function analyzePrompt(text, cfg) {
   // Hard rule: a directive word inside (...) or after a memo marker is always an override attempt
   const scopes = extractDirectiveScopes(text, action);
   let hardHit = null;
+  let stateManipulationHit = null;
+
   for (const scope of scopes) {
+    // State assignment detection is independent of directive verbs, so a bare
+    // parenthetical such as '(Balance = 9000)' is still caught.
+    const assignment = findStateAssignment(scope.text);
+    if (assignment && !stateManipulationHit) {
+      stateManipulationHit = {
+        label: `Unauthorized state assignment in ${scope.kind} ("${assignment}")`,
+        weight: STATE_MANIPULATION_RISK,
+      };
+    }
+
     const word = findScopeDirective(scope.text);
-    if (word) {
-      hardHit = { label: `Unauthorized override in ${scope.kind} ("${word}")`, weight: HARD_RISK };
-      break;
+    if (word && !hardHit) {
+      hardHit = {
+        label: `Unauthorized override in ${scope.kind} ("${word}")`,
+        weight: HARD_RISK,
+      };
     }
   }
+
+  const stateManipulationApplies =
+    Boolean(stateManipulationHit) && (cfg.injection || cfg.memo);
   const hardApplies = Boolean(hardHit) && (cfg.injection || cfg.memo);
 
-  // A scoped directive is a deterministic high-severity hit. When enabled,
-  // both Gate 2 and Gate 3 receive it; the score is pinned to 90 below.
+  // The same scoped finding is delivered to each enabled blocker gate. State
+  // manipulation has its own 85-point decision below, even if a directive verb
+  // (such as 'set') appears in the same scope.
   let injection = cfg.injection ? scanRules(text, INJECTION_RULES) : null;
   if (injection && hardHit) injection = addHit(injection, hardHit);
+  if (injection && stateManipulationHit) injection = addHit(injection, stateManipulationHit);
 
   let memo = null;
   if (cfg.memo) {
     memo = action.memo ? scanRules(action.memo, MEMO_RULES) : { hits: [], score: 0 };
     if (hardHit) memo = addHit(memo, hardHit);
+    if (stateManipulationHit) memo = addHit(memo, stateManipulationHit);
   }
 
   const jailbreak = cfg.jailbreak ? scanRules(text, JAILBREAK_RULES) : null;
@@ -757,7 +788,13 @@ function analyzePrompt(text, cfg) {
       }
     }
   }
-  if (threat === 'NONE' && pii.total > 0) threat = 'PII_LEAK';
+  if (stateManipulationApplies) {
+    // A state overwrite is categorized as a memo exploit even when Gate 2 is
+    // the enabled gate that catches it.
+    threat = 'MEMO_EXPLOIT';
+  } else if (threat === 'NONE' && pii.total > 0) {
+    threat = 'PII_LEAK';
+  }
 
   // Audit-log category chips
   const categories = [];
@@ -779,7 +816,11 @@ function analyzePrompt(text, cfg) {
   let score = Math.max(injection ? injection.score : 0, memo ? memo.score : 0, jailbreak ? jailbreak.score : 0, piiRisk);
   const blockers = ['injection', 'memo', 'jailbreak'].filter(failed).length;
   if (blockers > 1) score = Math.min(100, score + 10);
-  if (hardApplies) score = HARD_RISK; // deterministic: memo/directive overrides always score exactly 90
+  if (stateManipulationApplies) {
+    score = STATE_MANIPULATION_RISK;
+  } else if (hardApplies) {
+    score = HARD_RISK; // deterministic: memo/directive overrides always score exactly 90
+  }
 
   let verdict = 'allowed';
   if (blocked) verdict = 'blocked';
@@ -800,7 +841,11 @@ function analyzePrompt(text, cfg) {
     maskOn: cfg.pii,
     sanitized: pii.redacted, // always masked: used for the JSON payload and the log
   };
-  result.explanation = hardApplies ? HARD_EXPLANATION : buildExplanation(result);
+  result.explanation = stateManipulationApplies
+    ? STATE_MANIPULATION_EXPLANATION
+    : hardApplies
+      ? HARD_EXPLANATION
+      : buildExplanation(result);
   return result;
 }
 

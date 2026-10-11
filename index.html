@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bankism | Blue-Team AI Firewall &amp; Guardrail Defense</title>
+  <meta name="description" content="Bankism inspects every prompt through three defense gates before it reaches your banking AI: PII shield, injection filter and jailbreak guard.">
+  <meta name="color-scheme" content="dark">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <div class="threat-flash" id="threatFlash" aria-hidden="true"></div>
+
+  <div class="app">
+    <!-- ============ Header / telemetry ============ -->
+    <header class="topbar glass">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <defs>
+            <linearGradient id="markGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#00f2fe"/>
+              <stop offset="1" stop-color="#4facfe"/>
+            </linearGradient>
+          </defs>
+          <path d="M16 2.5 4.5 7v8.2c0 7 4.7 12.3 11.5 14.3 6.8-2 11.5-7.3 11.5-14.3V7L16 2.5Z" fill="none" stroke="url(#markGrad)" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M11 16.2 14.6 19.8 21.4 12.6" fill="none" stroke="url(#markGrad)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div>
+          <h1>Bankism</h1>
+          <p>Blue-team AI firewall &amp; guardrail defense</p>
+        </div>
+      </div>
+
+      <div class="status-badge" id="statusBadge" data-level="secure" role="status" aria-live="polite">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="statusText">SYSTEM SECURE</span>
+      </div>
+
+      <div class="telemetry">
+        <div class="stat">
+          <span class="stat-label">Requests scanned</span>
+          <span class="stat-value" id="statScanned" data-value="0">0</span>
+        </div>
+        <div class="stat stat-threat">
+          <span class="stat-label">Threats blocked</span>
+          <span class="stat-value" id="statBlocked" data-value="0">0</span>
+        </div>
+        <div class="stat stat-meter">
+          <span class="stat-label">Threat risk</span>
+          <div class="meter-row">
+            <div class="meter-track" id="riskMeter" role="meter" aria-label="Threat risk" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <div class="meter-mask" id="riskMask"></div>
+            </div>
+            <span class="meter-readout" id="riskReadout">0%</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <!-- ============ Left column: console + rules ============ -->
+      <div class="column-left">
+        <section class="panel glass" aria-labelledby="consoleTitle">
+          <h2 id="consoleTitle">Prompt console</h2>
+
+          <label for="promptInput" class="sr-only">Prompt to inspect</label>
+          <textarea id="promptInput" maxlength="2000" rows="6" spellcheck="false" placeholder="Paste a prompt to inspect before it reaches the model"></textarea>
+          <div class="console-meta">
+            <span id="charCount">0 / 2000</span>
+            <span>Ctrl + Enter to scan</span>
+          </div>
+
+          <div class="console-actions">
+            <button type="button" class="btn btn-primary" id="scanBtn">Scan prompt</button>
+            <button type="button" class="btn btn-ghost" id="clearInputBtn">Clear</button>
+          </div>
+
+          <h3 class="subhead">Quick tests</h3>
+          <div class="chips" role="group" aria-label="Preset test prompts">
+            <button type="button" class="chip" data-preset="safe" data-tone="safe"><span class="chip-dot" aria-hidden="true"></span>Safe query</button>
+            <button type="button" class="chip" data-preset="injection" data-tone="threat"><span class="chip-dot" aria-hidden="true"></span>Prompt injection</button>
+            <button type="button" class="chip" data-preset="pii" data-tone="warn"><span class="chip-dot" aria-hidden="true"></span>PII data leak</button>
+            <button type="button" class="chip" data-preset="jailbreak" data-tone="threat"><span class="chip-dot" aria-hidden="true"></span>Jailbreak roleplay</button>
+          </div>
+        </section>
+
+        <section class="panel glass" aria-labelledby="rulesTitle">
+          <h2 id="rulesTitle">Firewall rules</h2>
+
+          <label class="switch-row" for="rulePii">
+            <span class="switch-text">
+              <strong>Strict PII masking</strong>
+              <small>Replace emails, cards, IDs and account numbers with [REDACTED-PII]</small>
+            </span>
+            <input type="checkbox" class="switch" id="rulePii" role="switch" checked>
+          </label>
+
+          <label class="switch-row" for="ruleInjection">
+            <span class="switch-text">
+              <strong>Block prompt injections</strong>
+              <small>Stop instruction overrides, prompt extraction and payloads</small>
+            </span>
+            <input type="checkbox" class="switch" id="ruleInjection" role="switch" checked>
+          </label>
+
+          <label class="switch-row" for="ruleJailbreak">
+            <span class="switch-text">
+              <strong>Block jailbreaks</strong>
+              <small>Stop persona hijacks and restriction-free roleplay</small>
+            </span>
+            <input type="checkbox" class="switch" id="ruleJailbreak" role="switch" checked>
+          </label>
+
+          <label class="switch-row" for="ruleSound">
+            <span class="switch-text">
+              <strong>Sound effects</strong>
+              <small>Synthesized interface tones for clicks and verdicts</small>
+            </span>
+            <input type="checkbox" class="switch" id="ruleSound" role="switch" checked>
+          </label>
+        </section>
+      </div>
+
+      <!-- ============ Right column: gates + decision ============ -->
+      <div class="column-right">
+        <section aria-labelledby="gatesTitle">
+          <h2 id="gatesTitle" class="section-title">Defense gates</h2>
+          <div class="gates">
+            <article class="gate" data-gate="pii" data-state="idle">
+              <div class="gate-scan" aria-hidden="true"></div>
+              <div class="gate-head">
+                <span class="gate-index">Gate 1</span>
+                <span class="gate-state" data-role="state">Idle</span>
+              </div>
+              <svg class="gate-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 8h8M8 12h8M8 16h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              <h3>PII shield</h3>
+              <p class="gate-desc">Finds emails, cards, national IDs, keys and account numbers.</p>
+              <ul class="gate-findings" data-role="findings"><li>Waiting for a prompt</li></ul>
+            </article>
+
+            <article class="gate" data-gate="injection" data-state="idle">
+              <div class="gate-scan" aria-hidden="true"></div>
+              <div class="gate-head">
+                <span class="gate-index">Gate 2</span>
+                <span class="gate-state" data-role="state">Idle</span>
+              </div>
+              <svg class="gate-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M4 12h16M4 17h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"/><path d="m16 5 4 2-4 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+              <h3>Injection filter</h3>
+              <p class="gate-desc">Catches instruction overrides, prompt extraction and SQL payloads.</p>
+              <ul class="gate-findings" data-role="findings"><li>Waiting for a prompt</li></ul>
+            </article>
+
+            <article class="gate" data-gate="jailbreak" data-state="idle">
+              <div class="gate-scan" aria-hidden="true"></div>
+              <div class="gate-head">
+                <span class="gate-index">Gate 3</span>
+                <span class="gate-state" data-role="state">Idle</span>
+              </div>
+              <svg class="gate-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m6.5 6.5 11 11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              <h3>Jailbreak guard</h3>
+              <p class="gate-desc">Detects persona hijacks, privilege modes and restriction bypass.</p>
+              <ul class="gate-findings" data-role="findings"><li>Waiting for a prompt</li></ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel glass decision" aria-labelledby="decisionTitle" aria-live="polite">
+          <div class="decision-head">
+            <h2 id="decisionTitle">Gateway decision</h2>
+            <span class="badge badge-idle" id="verdictBadge">Awaiting prompt</span>
+          </div>
+          <p class="decision-summary" id="decisionSummary">Run a quick test or paste a prompt. Each prompt passes through all three gates in order.</p>
+          <div class="output-label" id="outputLabel">Prompt as forwarded to the model</div>
+          <pre class="sanitized" id="sanitizedOutput" tabindex="0"></pre>
+        </section>
+      </div>
+    </main>
+
+    <!-- ============ Audit log ============ -->
+    <section class="panel glass audit" aria-labelledby="auditTitle">
+      <div class="audit-head">
+        <h2 id="auditTitle">Live audit log</h2>
+        <button type="button" class="btn btn-ghost btn-small" id="clearLogBtn">Clear log</button>
+      </div>
+      <div class="table-wrap">
+        <table class="audit-table">
+          <thead>
+            <tr>
+              <th scope="col">Time</th>
+              <th scope="col">ID</th>
+              <th scope="col">Prompt (sanitized)</th>
+              <th scope="col">Verdict</th>
+              <th scope="col">Threat category</th>
+              <th scope="col">Risk</th>
+            </tr>
+          </thead>
+          <tbody id="auditBody"></tbody>
+        </table>
+      </div>
+      <p class="audit-empty" id="auditEmpty">No prompts scanned yet. Run a quick test or paste your own prompt.</p>
+    </section>
+  </div>
+</body>
+</html>
